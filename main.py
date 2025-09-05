@@ -6,27 +6,36 @@ import os
 app = Flask(__name__)
 app.secret_key = os.urandom(24)  # per sessioni sicure
 
-# Credenziali Spotify (meglio mettere come ENV VARIABLES su Render)
-CLIENT_ID = os.getenv("SPOTIPY_CLIENT_ID")
-CLIENT_SECRET = os.getenv("SPOTIPY_CLIENT_SECRET")
-REDIRECT_URI = os.getenv("SPOTIPY_REDIRECT_URI")
-
-
 SCOPE = "user-top-read user-read-recently-played"
+
+# ===========================
+# FUNZIONE PER LEGGERE CREDENZIALI
+# ===========================
+def get_spotify_credentials():
+    """
+    Legge le credenziali Spotify dalle variabili d'ambiente
+    al momento della richiesta.
+    """
+    client_id = os.getenv("SPOTIPY_CLIENT_ID")
+    client_secret = os.getenv("SPOTIPY_CLIENT_SECRET")
+    redirect_uri = os.getenv("SPOTIPY_REDIRECT_URI")
+    
+    if not all([client_id, client_secret, redirect_uri]):
+        raise ValueError("Variabili d'ambiente Spotify non impostate correttamente!")
+    
+    return client_id, client_secret, redirect_uri
 
 # ===========================
 # ROUTE FRONT-END
 # ===========================
 @app.route("/")
 def index():
-    # Se utente già loggato, reindirizza a dashboard
     if "token_info" in session:
         return redirect("/dashboard.html")
     return send_from_directory("static", "login.html")  # login.html nella cartella static
 
 @app.route("/dashboard.html")
 def dashboard():
-    # Serve la pagina dashboard front-end
     return send_from_directory("static", "dashboard.html")
 
 # ===========================
@@ -34,41 +43,35 @@ def dashboard():
 # ===========================
 @app.route("/login")
 def login():
+    client_id, client_secret, redirect_uri = get_spotify_credentials()
     sp_oauth = SpotifyOAuth(
-        client_id=CLIENT_ID,
-        client_secret=CLIENT_SECRET,
-        redirect_uri=REDIRECT_URI,
+        client_id=client_id,
+        client_secret=client_secret,
+        redirect_uri=redirect_uri,
         scope=SCOPE
     )
     auth_url = sp_oauth.get_authorize_url()
     return redirect(auth_url)
 
-@app.route("/env")
-def show_env():
-    return {
-        "CLIENT_ID": CLIENT_ID,
-        "CLIENT_SECRET": CLIENT_SECRET[:4] + "***",  # nasconde il resto
-        "REDIRECT_URI": REDIRECT_URI
-    }
-
-
 @app.route("/callback")
 def callback():
+    client_id, client_secret, redirect_uri = get_spotify_credentials()
     sp_oauth = SpotifyOAuth(
-        client_id=CLIENT_ID,
-        client_secret=CLIENT_SECRET,
-        redirect_uri=REDIRECT_URI,
+        client_id=client_id,
+        client_secret=client_secret,
+        redirect_uri=redirect_uri,
         scope=SCOPE
     )
     code = request.args.get('code')
+    if not code:
+        return "Errore: nessun codice ricevuto da Spotify", 400
+
     token_info = sp_oauth.get_access_token(code)
-    
-    # Salva token nella sessione
     session["token_info"] = token_info
-    return redirect("/dashboard.html")  # dopo login va al front-end
+    return redirect("/dashboard.html")
 
 # ===========================
-# ROUTE PER API FRONT-END
+# HELPER CLIENT SPOTIFY
 # ===========================
 def get_spotify_client():
     token_info = session.get("token_info", None)
@@ -76,12 +79,15 @@ def get_spotify_client():
         return None
     return Spotify(auth=token_info['access_token'])
 
+# ===========================
+# ROUTE API
+# ===========================
 @app.route("/api/recent")
 def recent_tracks():
     sp = get_spotify_client()
     if not sp:
         return jsonify({"error": "non autenticato"}), 401
-    
+
     recent = sp.current_user_recently_played(limit=30)['items']
     result = []
     for item in recent:
@@ -90,7 +96,8 @@ def recent_tracks():
             "name": track['name'],
             "artists": [a['name'] for a in track['artists']],
             "album": track['album']['name'],
-            "id": track['id']
+            "id": track['id'],
+            "image": track['album']['images'][0]['url'] if track['album']['images'] else None
         })
     return jsonify(result)
 
@@ -100,15 +107,26 @@ def top_items(category, time_range):
     if not sp:
         return jsonify({"error": "non autenticato"}), 401
 
-    limit = 30  # massimo ricavabile
+    limit = 30
     items = []
 
     if category == "track":
         items = sp.current_user_top_tracks(limit=limit, time_range=time_range)['items']
-        result = [{"name": t['name'], "artists": [a['name'] for a in t['artists']], "id": t['id']} for t in items]
+        result = [{
+            "name": t['name'],
+            "artists": [a['name'] for a in t['artists']],
+            "id": t['id'],
+            "image": t['album']['images'][0]['url'] if t['album']['images'] else None
+        } for t in items]
+
     elif category == "artist":
         items = sp.current_user_top_artists(limit=limit, time_range=time_range)['items']
-        result = [{"name": a['name'], "id": a['id']} for a in items]
+        result = [{
+            "name": a['name'],
+            "id": a['id'],
+            "image": a['images'][0]['url'] if a['images'] else None
+        } for a in items]
+
     elif category == "album":
         top_tracks = sp.current_user_top_tracks(limit=50, time_range=time_range)['items']
         albums = []
@@ -119,17 +137,34 @@ def top_items(category, time_range):
             if album_id not in seen and album['total_tracks'] > 1 and album['album_type'] == 'album':
                 albums.append(album)
                 seen.add(album_id)
-        result = [{"name": a['name'], "artists": [ar['name'] for ar in a['artists']], "id": a['id']} for a in albums[:limit]]
+        result = [{
+            "name": a['name'],
+            "artists": [ar['name'] for ar in a['artists']],
+            "id": a['id'],
+            "image": a['images'][0]['url'] if a['images'] else None
+        } for a in albums[:limit]]
     else:
         return jsonify({"error": "categoria non valida"}), 400
 
     return jsonify(result)
 
 # ===========================
+# ROUTA DI DEBUG ENV (opzionale)
+# ===========================
+@app.route("/env")
+def show_env():
+    try:
+        client_id, client_secret, redirect_uri = get_spotify_credentials()
+        return jsonify({
+            "CLIENT_ID": client_id[:4] + "***",
+            "CLIENT_SECRET": client_secret[:4] + "***",
+            "REDIRECT_URI": redirect_uri
+        })
+    except Exception as e:
+        return str(e), 500
+
+# ===========================
 # MAIN
 # ===========================
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8888)
-
-
-
