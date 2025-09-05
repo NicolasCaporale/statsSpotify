@@ -40,6 +40,15 @@ def get_sp_oauth():
         scope=SCOPE,
         cache_path=".spotifycache"
     )
+    def generate_jwt(access_token):
+    payload = {
+        "access_token": access_token,
+        "exp": int(time.time()) + JWT_EXP_DELTA_SECONDS
+    }
+    token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    user_tokens[token] = access_token
+    return token
+
 
 def get_top(sp, category, time_range, max_limit=MAX_LIMIT):
     items = []
@@ -129,15 +138,23 @@ def callback():
     code = request.args.get('code')
     token_info = sp_oauth.get_access_token(code)
     access_token = token_info['access_token']
-    sp = spotipy.Spotify(auth=access_token)
-    session['access_token'] = access_token
-    return redirect(url_for('stats'))
+
+    # genera JWT da restituire all'app
+    user_token = generate_jwt(access_token)
+
+    # ritorna JSON all'app nativa
+    return jsonify({"token": user_token})
+
 
 @app.route('/stats')
 def stats():
-    access_token = session.get('access_token')
+    user_token = request.headers.get("Authorization")
+    if not user_token:
+        return jsonify({"error": "Token mancante"}), 401
+
+    access_token = user_tokens.get(user_token)
     if not access_token:
-        return redirect(url_for('login'))
+        return jsonify({"error": "Token non valido o scaduto"}), 401
 
     sp = spotipy.Spotify(auth=access_token)
 
@@ -146,7 +163,6 @@ def stats():
         "medium_term": "Ultimi 6 mesi",
         "long_term": "Lifetime"
     }
-
     categories = ["track", "artist", "album"]
 
     data = {}
@@ -160,9 +176,11 @@ def stats():
 
     return jsonify(data)
 
+
 # ===========================
 # RUN
 # ===========================
 if __name__ == "__main__":
     app.run()
+
 
