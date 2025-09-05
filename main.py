@@ -9,8 +9,8 @@ app.secret_key = os.urandom(24)  # sessione sicura per ogni utente
 # ===========================
 # CONFIGURAZIONE SPOTIFY
 # ===========================
-CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
-CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
+CLIENT_ID = os.getenv("9358ec7ac43144f9b4a46cfea80dc4b1")
+CLIENT_SECRET = os.getenv("5fa2b039c36b47ada3e055b475034a59")
 REDIRECT_URI = os.getenv("SPOTIFY_REDIRECT_URI")  # es. https://tuo-dominio.render.com/callback
 
 SCOPE = "user-top-read user-read-recently-played"
@@ -147,3 +147,4 @@ def stats():
 
 if __name__ == "__main__":
     app.run()
+
