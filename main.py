@@ -4,29 +4,33 @@ from spotipy.oauth2 import SpotifyOAuth
 import os
 
 app = Flask(__name__)
-app.secret_key = os.urandom(24)  # sessione sicura per ogni utente
+app.secret_key = os.urandom(24)
 
 # ===========================
-# CONFIGURAZIONE SPOTIFY
+# CONFIGURAZIONE
 # ===========================
-CLIENT_ID = os.getenv("9358ec7ac43144f9b4a46cfea80dc4b1")
-CLIENT_SECRET = os.getenv("5fa2b039c36b47ada3e055b475034a59")
-REDIRECT_URI = os.getenv("https://statsspotify.onrender.com/callback")  # es. https://tuo-dominio.render.com/callback
-
 SCOPE = "user-top-read user-read-recently-played"
 MAX_LIMIT = 30
 
-sp_oauth = SpotifyOAuth(
-    client_id=CLIENT_ID,
-    client_secret=CLIENT_SECRET,
-    redirect_uri=REDIRECT_URI,
-    scope=SCOPE,
-    cache_path=".spotifycache"
-)
+# ===========================
+# FUNZIONI SPOTIFY
+# ===========================
+def get_sp_oauth():
+    client_id = os.getenv("SPOTIFY_CLIENT_ID")
+    client_secret = os.getenv("SPOTIFY_CLIENT_SECRET")
+    redirect_uri = os.getenv("SPOTIFY_REDIRECT_URI")
 
-# ===========================
-# FUNZIONI UTILI
-# ===========================
+    if not client_id or not client_secret or not redirect_uri:
+        raise Exception("Le variabili d'ambiente Spotify non sono impostate!")
+
+    return SpotifyOAuth(
+        client_id=client_id,
+        client_secret=client_secret,
+        redirect_uri=redirect_uri,
+        scope=SCOPE,
+        cache_path=".spotifycache"
+    )
+
 def get_top(sp, category, time_range, max_limit=MAX_LIMIT):
     items = []
     limit = 50
@@ -49,7 +53,6 @@ def get_top(sp, category, time_range, max_limit=MAX_LIMIT):
         return items[:max_limit]
 
     elif category == "album":
-        # ricaviamo album dai top tracks
         top_tracks = []
         offset_tracks = 0
         while True:
@@ -106,11 +109,13 @@ def format_top_items(items, category):
 # ===========================
 @app.route('/')
 def login():
+    sp_oauth = get_sp_oauth()
     auth_url = sp_oauth.get_authorize_url()
     return redirect(auth_url)
 
 @app.route('/callback')
 def callback():
+    sp_oauth = get_sp_oauth()
     code = request.args.get('code')
     token_info = sp_oauth.get_access_token(code)
     access_token = token_info['access_token']
@@ -145,7 +150,8 @@ def stats():
 
     return jsonify(data)
 
+# ===========================
+# RUN
+# ===========================
 if __name__ == "__main__":
     app.run()
-
-
