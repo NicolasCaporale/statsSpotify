@@ -2,6 +2,16 @@ from flask import Flask, redirect, request, session, url_for, jsonify
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import os
+import jwt
+import time
+
+# Chiave segreta per firmare JWT
+JWT_SECRET = os.urandom(24)
+JWT_ALGORITHM = "HS256"
+JWT_EXP_DELTA_SECONDS = 3600  # token valido 1 ora
+
+# Mappa temporanea sul server (in memoria)
+user_tokens = {}  # {user_jwt: access_token_spotify}
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
@@ -155,3 +165,4 @@ def stats():
 # ===========================
 if __name__ == "__main__":
     app.run()
+
