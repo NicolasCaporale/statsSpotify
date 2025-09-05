@@ -11,19 +11,12 @@ SCOPE = "user-top-read user-read-recently-played"
 # ===========================
 # FUNZIONE PER LEGGERE CREDENZIALI
 # ===========================
-def get_spotify_credentials():
-    """
-    Legge le credenziali Spotify dalle variabili d'ambiente
-    al momento della richiesta.
-    """
-    client_id = os.getenv("SPOTIPY_CLIENT_ID")
-    client_secret = os.getenv("SPOTIPY_CLIENT_SECRET")
-    redirect_uri = os.getenv("SPOTIPY_REDIRECT_URI")
-    
-    if not all([client_id, client_secret, redirect_uri]):
-        raise ValueError("Variabili d'ambiente Spotify non impostate correttamente!")
-    
-    return client_id, client_secret, redirect_uri
+# ===========================
+# CREDENZIALI SPOTIFY HARD-CODATE
+# ===========================
+CLIENT_ID = "9358ec7ac43144f9b4a46cfea80dc4b1"
+CLIENT_SECRET = "5fa2b039c36b47ada3e055b475034a59"
+REDIRECT_URI = "https://statsspotify.onrender.com/callback"
 
 # ===========================
 # ROUTE FRONT-END
@@ -43,7 +36,6 @@ def dashboard():
 # ===========================
 @app.route("/login")
 def login():
-    client_id, client_secret, redirect_uri = get_spotify_credentials()
     sp_oauth = SpotifyOAuth(
         client_id=client_id,
         client_secret=client_secret,
@@ -55,7 +47,6 @@ def login():
 
 @app.route("/callback")
 def callback():
-    client_id, client_secret, redirect_uri = get_spotify_credentials()
     sp_oauth = SpotifyOAuth(
         client_id=client_id,
         client_secret=client_secret,
@@ -154,7 +145,6 @@ def top_items(category, time_range):
 @app.route("/env")
 def show_env():
     try:
-        client_id, client_secret, redirect_uri = get_spotify_credentials()
         return jsonify({
             "CLIENT_ID": client_id[:4] + "***",
             "CLIENT_SECRET": client_secret[:4] + "***",
@@ -168,3 +158,4 @@ def show_env():
 # ===========================
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8888)
+
