@@ -43,6 +43,15 @@ def login():
     auth_url = sp_oauth.get_authorize_url()
     return redirect(auth_url)
 
+@app.route("/env")
+def show_env():
+    return {
+        "CLIENT_ID": CLIENT_ID,
+        "CLIENT_SECRET": CLIENT_SECRET[:4] + "***",  # nasconde il resto
+        "REDIRECT_URI": REDIRECT_URI
+    }
+
+
 @app.route("/callback")
 def callback():
     sp_oauth = SpotifyOAuth(
@@ -121,5 +130,6 @@ def top_items(category, time_range):
 # ===========================
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8888)
+
 
 
