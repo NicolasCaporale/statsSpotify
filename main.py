@@ -7,9 +7,10 @@ app = Flask(__name__)
 app.secret_key = os.urandom(24)  # per sessioni sicure
 
 # Credenziali Spotify (meglio mettere come ENV VARIABLES su Render)
-CLIENT_ID = os.getenv("9358ec7ac43144f9b4a46cfea80dc4b1")
-CLIENT_SECRET = os.getenv("5fa2b039c36b47ada3e055b475034a59")
-REDIRECT_URI = "https://statsspotify.onrender.com/callback"  # cambiare col dominio render
+CLIENT_ID = os.getenv("SPOTIPY_CLIENT_ID")
+CLIENT_SECRET = os.getenv("SPOTIPY_CLIENT_SECRET")
+REDIRECT_URI = os.getenv("SPOTIPY_REDIRECT_URI")
+
 
 SCOPE = "user-top-read user-read-recently-played"
 
@@ -120,4 +121,5 @@ def top_items(category, time_range):
 # ===========================
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8888)
+
 
